@@ -1885,7 +1885,6 @@ if uploaded_file is not None:
                                     
                                     st.success("✅ Models trained successfully! Results are now persistent across page interactions.")
                                     st.balloons()
-                                    st.success("🎉 Tamamdır eline sağlık! Modeller başarıyla eğitildi ve özel hassasiyet ayarları uygulandı.")
                             except Exception as e:
                                 st.error(f"Error running models: {str(e)}")
                                 st.write("Please check your data format and try again.")
