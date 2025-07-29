@@ -1,0 +1,9 @@
+tf-nightly
+streamlit
+pandas
+numpy
+matplotlib
+seaborn
+scikit-learn
+scipy
+openpyxl 
