@@ -1444,7 +1444,7 @@ class MLModels:
                     st.metric("Baseline Value", f"{baseline_val:.2f}")
                 with comparison_col3:
                     st.metric("Modified Value", f"{modified_value:.2f}", 
-                             delta=f"{modified_value - baseline_val:+.2f}")
+                             delta=f"{modified_value - baseline_val:+.3g}")
                 
                 st.write("**🤖 Model Selection:**")
                 model_options = list(results.keys())
@@ -1523,14 +1523,13 @@ class MLModels:
                             delta_cols = st.columns(len(output_cols))
                             for i, (col_name, delta_value) in enumerate(zip(output_cols, deltas)):
                                 with delta_cols[i]:
-                                    delta_color = "normal"
+                                    delta_color = "inverse"
                                     if abs(delta_value) > abs(baseline_predictions[i]) * 0.05:  # >5% change
-                                        delta_color = "inverse"
-                                    
+                                        delta_color = "normal"      
                                     format_str = self._get_format_for_column(col_name)
                                     st.metric(
                                         label=f"**{col_name}**",
-                                        value=f"{delta_value:+{format_str[1:]}}",
+                                        value=f"{delta_value:+.3g}",
                                         delta=f"{percentage_changes[i]:+.2f}%",
                                         delta_color=delta_color,
                                         help="Difference (Modified - Baseline)"
@@ -1542,7 +1541,7 @@ class MLModels:
                                 'Output': output_cols,
                                 'Baseline': [f"{pred:{self._get_format_for_column(col)}}" for pred, col in zip(baseline_predictions, output_cols)],
                                 'Modified': [f"{pred:{self._get_format_for_column(col)}}" for pred, col in zip(modified_predictions, output_cols)],
-                                'Delta': [f"{delta:+{self._get_format_for_column(col)[1:]}}" for delta, col in zip(deltas, output_cols)],
+                                'Delta': [f"{delta:+.3g}" for delta, col in zip(deltas, output_cols)],
                                 'Change %': [f"{pct:+.2f}%" for pct in percentage_changes]
                             }
                             summary_df = pd.DataFrame(summary_data)
@@ -1581,8 +1580,14 @@ class MLModels:
                             # Add value labels on bars
                             for bar, delta, pct in zip(bars, deltas, percentage_changes):
                                 height = bar.get_height()
-                                ax2.text(bar.get_x() + bar.get_width()/2., height + (max(deltas) - min(deltas))*0.01,
-                                        f'{delta:+.2f}\n({pct:+.1f}%)', ha='center', va='bottom', fontsize=9)
+                                if height >= 0:
+                                    y = bar.get_y() + height * 0.5  # Middle of positive bar
+                                    va = 'center'
+                                else:
+                                    y = bar.get_y() + height * 0.5  # Middle of negative bar
+                                    va = 'center'
+                                ax2.text(bar.get_x() + bar.get_width()/2., y,
+                                        f'{delta:+.3g}\n({pct:+.1f}%)', ha='center', va=va, fontsize=9, color='white')
                             
                             plt.tight_layout()
                             st.pyplot(fig)
