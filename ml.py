@@ -1840,7 +1840,7 @@ if uploaded_file is not None:
                     analysis_cols = input_cols + output_cols
                     if analysis_cols:
                         # Side by side layout
-                        col1, col2 = st.columns([1, 2])
+                        col1, col2 = st.columns([2, 3])
                         
                         with col1:
                             if len(input_cols) > 0 and len(output_cols) > 0:
