@@ -489,17 +489,14 @@ class MLModels:
         y_train_scaled = scaler_y.fit_transform(y_train)
         model = keras.Sequential([
             keras.layers.Input(shape=(X.shape[1],), name='input_layer'),
-            keras.layers.Dense(256, activation='relu', name='dense_1'),
+            keras.layers.Dense(64, activation='relu', name='dense_1'),
             keras.layers.BatchNormalization(name='batch_norm_1'),
-            keras.layers.Dropout(0.3, name='dropout_1'),
-            
-            keras.layers.Dense(128, activation='relu', name='dense_2'),
+            keras.layers.Dropout(0.4, name='dropout_1'),
+
+            keras.layers.Dense(32, activation='relu', name='dense_2'),
             keras.layers.BatchNormalization(name='batch_norm_2'),
-            keras.layers.Dropout(0.2, name='dropout_2'),
-            
-            keras.layers.Dense(64, activation='relu', name='dense_3'),
-            keras.layers.Dropout(0.1, name='dropout_3'),
-            
+            keras.layers.Dropout(0.3, name='dropout_2'),
+
             keras.layers.Dense(y.shape[1], activation='linear', name='output_layer')
         ])
         
@@ -516,7 +513,7 @@ class MLModels:
         callbacks = [
             keras.callbacks.EarlyStopping(
                 monitor='val_loss',
-                patience=15,
+                patience=8,  # reduced from 15
                 restore_best_weights=True,
                 verbose=0
             ),
@@ -531,7 +528,7 @@ class MLModels:
         
         history = model.fit(
             X_train_scaled, y_train_scaled,
-            epochs=100,
+            epochs=50,  # reduced from 100
             batch_size=32,
             validation_split=0.2,
             verbose=0,
@@ -1190,11 +1187,20 @@ class MLModels:
         best_mape = results_df.loc[best_model, "MAPE"]
         
         # Show best model prominently
-        st.success(f"🏆 **Best Model: {best_model}** with R² = {best_r2:.2f} and MAPE = {best_mape:.2f}")
+        st.success(f"🏆 **Best Model: {best_model}** with R² = {best_r2:.2f} and MAPE = {best_mape*100:.2f}%")
         
         # Create tabs for different model result views
-        st.subheader("🤖 Model Results & Analysis")
-        
+        header_col1, header_col2 = st.columns([5,1])
+        with header_col1:
+            st.subheader("🤖 Model Results & Analysis")
+        with header_col2:
+            if st.button("🗑️ Clear Results", help="Clear model results and start fresh", key="clear_results_analysis_header"):
+                st.session_state.model_results = None
+                st.session_state.trained_models = None
+                st.session_state.model_input_cols = None
+                st.session_state.model_output_cols = None
+                st.session_state.processed_data = None
+                st.rerun()
         
         calc_tab1, calc_tab2, calc_tab3, calc_tab4, calc_tab5 = st.tabs(["🎯 Make Predictions", "🧪 Variable Impact Test", "⚖️ Compare All Models", "📊 Model Comparison", "📐 Model Equations"])
             
@@ -1252,8 +1258,8 @@ class MLModels:
                     st.info(f"**{selected_model}**: {model_info[selected_model]}")
                 
                 selected_r2 = results[selected_model]["R²"]
-                selected_mape = results[selected_model]["MAPE"]
-                st.write(f"**Selected Model Performance**: R² = {selected_r2:.2f}, MAPE = {selected_mape:.2f}")
+                selected_mape = results[selected_model]["MAPE"] * 100  # percent
+                st.write(f"**Selected Model Performance**: R² = {selected_r2:.2f}, MAPE = {selected_mape:.2f}%")
                 
                 predict_button = st.form_submit_button("🚀 Predict", type="primary")
                 
@@ -1339,13 +1345,12 @@ class MLModels:
                                 st.dataframe(input_df)
                                 
                             model_r2 = results[selected_model]["R²"]
-                            model_mape = results[selected_model]["MAPE"]
-                            
+                            model_mape = results[selected_model]["MAPE"] * 100  # percent
                             confidence_color = "green" if model_r2 > 0.9 else "orange" if model_r2 > 0.7 else "red"
                             st.markdown(f"""
                             **Model Performance:**
                             - R² Score: ::{confidence_color}[{model_r2:.2f}]
-                            - MAPE: {model_mape:.2f} ({model_mape*100:.2f}%)
+                            - MAPE: {model_mape:.2f}%
                             """)
                             
                         else:
@@ -1372,6 +1377,14 @@ class MLModels:
         
         with calc_tab2:
             st.write("Test how changing one variable affects your predictions:")
+            
+            # Move variable selection outside the form for dynamic updates
+            variable_to_change = st.selectbox(
+                "Choose variable to modify:",
+                options=input_cols,
+                key="variable_impact_variable",
+                help="This variable will be tested with a different value"
+            )
             
             with st.form("variable_impact_form"):
                 st.write("**🎯 Baseline Input Values:**")
@@ -1401,32 +1414,13 @@ class MLModels:
                             )
                 
                 st.divider()
-                st.write("**🔀 Variable to Change:**")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    variable_to_change = st.selectbox(
-                        "Choose variable to modify:",
-                        options=input_cols,
-                        key="variable_impact_variable",
-                        help="This variable will be tested with a different value"
-                    )
-                
-                with col2:
-                    # Show info about selected variable
-                    col_data = df_processed[variable_to_change]
-                    min_val = float(col_data.min())
-                    max_val = float(col_data.max())
-                    mean_val = float(col_data.mean())
-                    baseline_val = baseline_values[variable_to_change]
-                    
-                    st.info(f"""
-                    **{variable_to_change} Info:**
-                    - Dataset Mean: {mean_val:.2f}
-                    - Dataset Range: [{min_val:.2f}, {max_val:.2f}]
-                    - Current Baseline: {baseline_val:.2f}
-                    """)
+                # Show selected variable and its info at the top
+                col_data = df_processed[variable_to_change]
+                min_val = float(col_data.min())
+                max_val = float(col_data.max())
+                mean_val = float(col_data.mean())
+                baseline_val = baseline_values[variable_to_change]
+                dtype_val = col_data.dtype
                 
                 st.write(f"**🎛️ Alternative Value for {variable_to_change}:**")
                 
@@ -1441,7 +1435,6 @@ class MLModels:
                     help=f"This will replace the baseline value of {baseline_val:.2f}"
                 )
                 
-                # Show the comparison
                 st.write("**📊 Comparison Summary:**")
                 comparison_col1, comparison_col2, comparison_col3 = st.columns(3)
                 
@@ -1696,7 +1689,7 @@ class MLModels:
             st.write("**Performance Comparison Table:**")
             try:
                 styled_df = results_df.style.highlight_max(subset=["R²"]).highlight_min(subset=["MAPE"])
-                st.dataframe(styled_df)
+                st.dataframe(styled_df.format({"R²": "{:.2f}", "MAPE": lambda x: f"{x*100:.2f}%"}))
             except Exception as e:
                 try:
                     clean_results = results_df.copy().reset_index()
@@ -1705,7 +1698,7 @@ class MLModels:
                             clean_results[col] = clean_results[col].astype(str)
                         elif np.issubdtype(clean_results[col].dtype, np.number):
                             clean_results[col] = clean_results[col].astype('float64')
-                    st.dataframe(clean_results)
+                    st.dataframe(clean_results.style.format({"R²": "{:.2f}", "MAPE": lambda x: f"{x*100:.2f}%"}))
                 except Exception as e2:
                     st.error(f"Could not display results table: {str(e2)}")
                     st.write("Results:", results_df.to_dict())
@@ -1733,7 +1726,7 @@ class MLModels:
             
             with col2:
                 fig, ax = plt.subplots(figsize=(10, 6))
-                mape_scores = results_df["MAPE"].values
+                mape_scores = results_df["MAPE"].values * 100  # Convert to percent for chart
                 colors = ['gold' if model == best_model else 'lightcoral' for model in models]
                 bars = ax.bar(models, mape_scores, color=colors)
                 ax.set_ylabel('MAPE Score')
@@ -1742,7 +1735,7 @@ class MLModels:
                 
                 for bar, score in zip(bars, mape_scores):
                     ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(mape_scores)*0.01,
-                           f'{score:.2f}', ha='center', va='bottom')
+                           f'{score:.2f}%', ha='center', va='bottom')
                 
                 plt.tight_layout()
                 st.pyplot(fig)
@@ -1836,9 +1829,6 @@ if uploaded_file is not None:
             if selected_outputs:
                 output_cols = selected_outputs
         
-        # Model Management Section (next to column selection)
-        
-        # Data Analysis in Tabs (Secondary Information)
         st.divider()
         st.subheader("📊 Data Analysis & Information")
         
@@ -2156,17 +2146,7 @@ if uploaded_file is not None:
             st.session_state.processed_data = None
 
         
-        if st.session_state.model_results is not None:
-            col1, col2 = st.columns([3, 1])
-            with col2:
-                if st.button("🗑️ Clear Results", help="Clear model results and start fresh"):
-                    st.session_state.model_results = None
-                    st.session_state.trained_models = None
-                    st.session_state.model_input_cols = None
-                    st.session_state.model_output_cols = None
-                    st.session_state.processed_data = None
-                    st.rerun()
-            
+        if st.session_state.model_results is not None:            
             display_ml_models = MLModels()
             display_ml_models.models = st.session_state.trained_models.models
             display_ml_models.model_scalers = st.session_state.trained_models.model_scalers
