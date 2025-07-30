@@ -1195,570 +1195,561 @@ class MLModels:
         # Create tabs for different model result views
         st.subheader("🤖 Model Results & Analysis")
         
-        # Split into two columns: Calculations (left) and Information (right)
-        calc_col, info_col = st.columns([1, 1])
         
-        with calc_col:
-            calc_tab1, calc_tab2, calc_tab3, calc_tab4 = st.tabs(["🎯 Make Predictions", "🧪 Variable Impact Test", "⚖️ Compare All Models", "🔬 Variable Effect Analysis"])
+        calc_tab1, calc_tab2, calc_tab3, calc_tab4, calc_tab5 = st.tabs(["🎯 Make Predictions", "🧪 Variable Impact Test", "⚖️ Compare All Models", "📊 Model Comparison", "📐 Model Equations"])
             
-            with calc_tab1:
-                st.write("Enter input values to get predictions from your trained models:")
+        with calc_tab1:
+            st.write("Enter input values to get predictions from your trained models:")
                 
-                with st.form("prediction_form"):
-                    st.write("**Input Values:**")
+            with st.form("prediction_form"):
+                st.write("**Input Values:**")
                     
-                    input_values = {}
-                    cols_per_row = 3
-                    input_rows = [input_cols[i:i + cols_per_row] for i in range(0, len(input_cols), cols_per_row)]
-                    
-                    for row in input_rows:
-                        cols = st.columns(len(row))
-                        for i, col_name in enumerate(row):
-                            with cols[i]:
-                                col_data = df_processed[col_name]
-                                min_val = float(col_data.min())
-                                max_val = float(col_data.max())
-                                mean_val = float(col_data.mean())
-                                
-                                display_name = str(col_name)
-                                input_values[col_name] = st.number_input(
-                                    f"{display_name}",
-                                    min_value=min_val * 0.5,
-                                    max_value=max_val * 1.5,
-                                    value=mean_val,
-                                    step=(max_val - min_val) / 100,
-                                    format="%.2f"
-                                )
-                    
-                    st.write("**Model Selection:**")
-                    model_options = list(results.keys())
-                    default_model_idx = model_options.index(best_model)
-                    
-                    selected_model = st.selectbox(
-                        "Choose model for prediction:",
-                        options=model_options,
-                        index=default_model_idx,
-                        help=f"Best model ({best_model}) is selected by default"
-                    )
-                    model_info = {
-                        "Linear Regression": "Direct mathematical relationship",
-                        "Linear Regression (CV)": "Direct mathematical relationship with cross-validation",
-                        "Polynomial Regression": "Non-linear relationships with polynomial features",
-                        "Polynomial Regression (CV)": "Non-linear relationships with polynomial features and cross-validation",
-                        "Exponential Regression": "Log-linear transformation for exponential relationships",
-                        "Exponential Regression (CV)": "Log-linear transformation for exponential relationships with cross-validation",
-                        "ANN": "Deep learning with batch normalization (TF Nightly optimized)",
-                        "RNN": "Sequence-based predictions with bidirectional GRU (TF Nightly optimized)"
-                    }
-                    
-                    if selected_model in model_info:
-                        st.info(f"**{selected_model}**: {model_info[selected_model]}")
-                    
-                    selected_r2 = results[selected_model]["R²"]
-                    selected_mape = results[selected_model]["MAPE"]
-                    st.write(f"**Selected Model Performance**: R² = {selected_r2:.2f}, MAPE = {selected_mape:.2f}")
-                    
-                    predict_button = st.form_submit_button("🚀 Predict", type="primary")
-                    
-                    if predict_button:
-                        try:
-                            input_array = np.array([[input_values[col] for col in input_cols]])
-                            if selected_model in ml_models.models and ml_models.models[selected_model] is not None:
-                                model = ml_models.models[selected_model]
-                                
-                                if selected_model == "RNN":
-                                    if selected_model in ml_models.model_scalers:
-                                        rnn_scalers = ml_models.model_scalers[selected_model]
-                                        time_steps = 10
-                                        input_scaled = rnn_scalers['X_scaler'].transform(input_array)
-                                        
-                                        input_sequence = np.repeat(input_scaled, time_steps, axis=0).reshape(1, time_steps, -1)
-                                        
-                                        pred_scaled = model.predict(input_sequence, verbose=0)
-                                        pred_log = rnn_scalers['y_scaler'].inverse_transform(pred_scaled)
-                                        predictions = np.exp(pred_log)[0]
-                                    else:
-                                        time_steps = 10
-                                        input_scaled = ml_models.X_scaler.transform(input_array)
-                                        input_sequence = np.repeat(input_scaled, time_steps, axis=0).reshape(1, time_steps, -1)
-                                        pred_scaled = model.predict(input_sequence, verbose=0)
-                                        pred_log = ml_models.y_scaler.inverse_transform(pred_scaled)
-                                        predictions = np.exp(pred_log)[0]
-                                    
-                                elif selected_model == "ANN":
-                                    if selected_model in ml_models.model_scalers:
-                                        ann_scalers = ml_models.model_scalers[selected_model]
-                                        input_scaled = ann_scalers['X_scaler'].transform(input_array)
-                                        pred_scaled = model.predict(input_scaled, verbose=0)
-                                        predictions = ann_scalers['y_scaler'].inverse_transform(pred_scaled)[0]
-                                    else:
-                                        input_scaled = ml_models.X_scaler.transform(input_array)
-                                        pred_scaled = model.predict(input_scaled, verbose=0)
-                                        predictions = pred_scaled[0]
-                                    
-                                elif selected_model == "Linear Regression" or selected_model == "Linear Regression (CV)":
-                                    models, scaler = model
-                                    input_scaled = scaler.transform(input_array)
-                                    predictions = []
-                                    for i, lin_model in enumerate(models):
-                                        pred = lin_model.predict(input_scaled)[0]
-                                        predictions.append(pred)
-                                    
-                                elif selected_model == "Polynomial Regression" or selected_model == "Polynomial Regression (CV)":
-                                    predictions = model.predict(input_array)[0]
-                                    
-                                elif selected_model == "Exponential Regression" or selected_model == "Exponential Regression (CV)":
-                                    models, scaler = model
-                                    input_scaled = scaler.transform(input_array)
-                                    predictions = []
-                                    for i, exp_model in enumerate(models):
-                                        if exp_model is None:
-                                            predictions.append(0.0)
-                                        else:
-                                            try:
-                                                log_pred = exp_model.predict(input_scaled)[0]
-                                                pred = np.exp(log_pred)
-                                                predictions.append(pred)
-                                            except:
-                                                predictions.append(0.0)
-                                    
-                                else: 
-                                    predictions = [0.0] * len(output_cols)
-                                                     
-                                st.success(f"✅ Predictions using **{selected_model}**:")
-                                
-                                pred_cols = st.columns(len(output_cols))
-                                for i, (col_name, pred_value) in enumerate(zip(output_cols, predictions)):
-                                    with pred_cols[i]:
-                                        format_str = self._get_format_for_column(col_name)
-                                        st.metric(
-                                            label=f"**{col_name}**",
-                                            value=f"{float(pred_value):{format_str}}",
-                                            help=f"Predicted value for {col_name}"
-                                        )
-                                
-                                with st.expander("📋 Input Summary"):
-                                    input_df = pd.DataFrame([input_values])
-                                    st.dataframe(input_df)
-                                    
-                                model_r2 = results[selected_model]["R²"]
-                                model_mape = results[selected_model]["MAPE"]
-                                
-                                confidence_color = "green" if model_r2 > 0.9 else "orange" if model_r2 > 0.7 else "red"
-                                st.markdown(f"""
-                                **Model Performance:**
-                                - R² Score: ::{confidence_color}[{model_r2:.2f}]
-                                - MAPE: {model_mape:.2f} ({model_mape*100:.2f}%)
-                                """)
-                                
-                            else:
-                                st.error(f"Model {selected_model} not available for prediction. Please retrain the models.")
-                                
-                        except Exception as e:
-                            st.error(f"Error making prediction: {str(e)}")
-                            st.write("Please check your input values and try again.")
-                        
-                with st.expander("💡 Example Input Values"):
-                    st.write("Here are some example values from your dataset:")
-                    example_data = df_processed[input_cols].sample(n=min(5, len(df_processed)), random_state=42)
-                    
-                    display_example = example_data.copy()
-                    for col in display_example.columns:
-                        display_example[col] = display_example[col].astype('float64')
-                    display_example = display_example.reset_index(drop=True)
-                    
-                    st.dataframe(display_example.round(2))
-                    st.write("💡 **Tip**: You can copy these values to test the prediction functionality.")
-                    
-                    if st.button("🔄 Load Random Example", help="Load a random example into the input fields above"):
-                        st.rerun()
-            
-            with calc_tab2:
-                st.write("Test how changing one variable affects your predictions:")
+                input_values = {}
+                cols_per_row = 3
+                input_rows = [input_cols[i:i + cols_per_row] for i in range(0, len(input_cols), cols_per_row)]
                 
-                with st.form("variable_impact_form"):
-                    st.write("**🎯 Baseline Input Values:**")
-                    
-                    baseline_values = {}
-                    cols_per_row = 3
-                    input_rows = [input_cols[i:i + cols_per_row] for i in range(0, len(input_cols), cols_per_row)]
-                    
-                    for row in input_rows:
-                        cols = st.columns(len(row))
-                        for i, col_name in enumerate(row):
-                            with cols[i]:
-                                col_data = df_processed[col_name]
-                                min_val = float(col_data.min())
-                                max_val = float(col_data.max())
-                                mean_val = float(col_data.mean())
-                                
-                                display_name = str(col_name)
-                                baseline_values[col_name] = st.number_input(
-                                    f"{display_name} (baseline)",
-                                    min_value=min_val * 0.5,
-                                    max_value=max_val * 1.5,
-                                    value=mean_val,
-                                    step=(max_val - min_val) / 100,
-                                    format="%.2f",
-                                    key=f"baseline_{col_name}"
-                                )
-                    
-                    st.divider()
-                    st.write("**🔀 Variable to Change:**")
-                    
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        variable_to_change = st.selectbox(
-                            "Choose variable to modify:",
-                            options=input_cols,
-                            key="variable_impact_variable",
-                            help="This variable will be tested with a different value"
-                        )
-                    
-                    with col2:
-                        # Show info about selected variable
-                        col_data = df_processed[variable_to_change]
-                        min_val = float(col_data.min())
-                        max_val = float(col_data.max())
-                        mean_val = float(col_data.mean())
-                        baseline_val = baseline_values[variable_to_change]
-                        
-                        st.info(f"""
-                        **{variable_to_change} Info:**
-                        - Dataset Mean: {mean_val:.2f}
-                        - Dataset Range: [{min_val:.2f}, {max_val:.2f}]
-                        - Current Baseline: {baseline_val:.2f}
-                        """)
-                    
-                    st.write(f"**🎛️ Alternative Value for {variable_to_change}:**")
-                    
-                    modified_value = st.number_input(
-                        f"New value for {variable_to_change}:",
-                        min_value=min_val * 0.5,
-                        max_value=max_val * 1.5,
-                        value=baseline_val * 1.1,  # Default to 10% increase
-                        step=(max_val - min_val) / 100,
-                        format="%.2f",
-                        key=f"modified_{variable_to_change}",
-                        help=f"This will replace the baseline value of {baseline_val:.2f}"
-                    )
-                    
-                    # Show the comparison
-                    st.write("**📊 Comparison Summary:**")
-                    comparison_col1, comparison_col2, comparison_col3 = st.columns(3)
-                    
-                    with comparison_col1:
-                        st.metric("Variable", variable_to_change)
-                    with comparison_col2:
-                        st.metric("Baseline Value", f"{baseline_val:.2f}")
-                    with comparison_col3:
-                        st.metric("Modified Value", f"{modified_value:.2f}", 
-                                 delta=f"{modified_value - baseline_val:+.2f}")
-                    
-                    st.write("**🤖 Model Selection:**")
-                    model_options = list(results.keys())
-                    results_df = pd.DataFrame({
-                        model: {"R²": float(results[model]["R²"]), "MAPE": float(results[model]["MAPE"])} 
-                        for model in results.keys()
-                    }).T.sort_values("R²", ascending=False)
-                    best_model = results_df.index[0]
-                    default_model_idx = model_options.index(best_model)
-                    
-                    selected_model = st.selectbox(
-                        "Choose model for variable impact test:",
-                        options=model_options,
-                        index=default_model_idx,
-                        help=f"Best model ({best_model}) is selected by default",
-                        key="variable_impact_model"
-                    )
-                    
-                    test_button = st.form_submit_button("🧪 Run Variable Impact Test", type="primary")
-                    
-                    if test_button:
-                        try:
-                            # Prepare baseline input array
-                            baseline_array = np.array([[baseline_values[col] for col in input_cols]])
-                            
-                            # Prepare modified input array
-                            modified_values = baseline_values.copy()
-                            modified_values[variable_to_change] = modified_value
-                            modified_array = np.array([[modified_values[col] for col in input_cols]])
-                            
-                            if selected_model in ml_models.models and ml_models.models[selected_model] is not None:
-                                # Get baseline predictions
-                                baseline_predictions = self._get_model_prediction(selected_model, baseline_array, ml_models)
-                                
-                                # Get modified predictions
-                                modified_predictions = self._get_model_prediction(selected_model, modified_array, ml_models)
-                                
-                                # Calculate deltas
-                                deltas = [mod - base for mod, base in zip(modified_predictions, baseline_predictions)]
-                                percentage_changes = []
-                                for i, (base, delta) in enumerate(zip(baseline_predictions, deltas)):
-                                    if base != 0:
-                                        pct = (delta / base) * 100
-                                    else:
-                                        pct = 0.0
-                                    percentage_changes.append(pct)
-                                
-                                st.success(f"✅ Variable Impact Test Complete using **{selected_model}**")
-                                
-                                # Display baseline results
-                                st.write("**📊 Baseline Results:**")
-                                baseline_cols = st.columns(len(output_cols))
-                                for i, (col_name, pred_value) in enumerate(zip(output_cols, baseline_predictions)):
-                                    with baseline_cols[i]:
-                                        format_str = self._get_format_for_column(col_name)
-                                        st.metric(
-                                            label=f"**{col_name}**",
-                                            value=f"{float(pred_value):{format_str}}",
-                                            help="Prediction with original values"
-                                        )
-                                
-                                # Display modified results
-                                st.write("**🔄 Modified Results:**")
-                                modified_cols = st.columns(len(output_cols))
-                                for i, (col_name, pred_value) in enumerate(zip(output_cols, modified_predictions)):
-                                    with modified_cols[i]:
-                                        format_str = self._get_format_for_column(col_name)
-                                        st.metric(
-                                            label=f"**{col_name}**",
-                                            value=f"{float(pred_value):{format_str}}",
-                                            help=f"Prediction with {variable_to_change} = {modified_value:.2f}"
-                                        )
-                                
-                                # Display delta results
-                                st.write("**📈 Delta Results:**")
-                                delta_cols = st.columns(len(output_cols))
-                                for i, (col_name, delta_value) in enumerate(zip(output_cols, deltas)):
-                                    with delta_cols[i]:
-                                        delta_color = "normal"
-                                        if abs(delta_value) > abs(baseline_predictions[i]) * 0.05:  # >5% change
-                                            delta_color = "inverse"
-                                        
-                                        format_str = self._get_format_for_column(col_name)
-                                        st.metric(
-                                            label=f"**{col_name}**",
-                                            value=f"{delta_value:+{format_str[1:]}}",
-                                            delta=f"{percentage_changes[i]:+.2f}%",
-                                            delta_color=delta_color,
-                                            help="Difference (Modified - Baseline)"
-                                        )
-                                
-                                # Summary table
-                                st.write("**📋 Summary Table:**")
-                                summary_data = {
-                                    'Output': output_cols,
-                                    'Baseline': [f"{pred:{self._get_format_for_column(col)}}" for pred, col in zip(baseline_predictions, output_cols)],
-                                    'Modified': [f"{pred:{self._get_format_for_column(col)}}" for pred, col in zip(modified_predictions, output_cols)],
-                                    'Delta': [f"{delta:+{self._get_format_for_column(col)[1:]}}" for delta, col in zip(deltas, output_cols)],
-                                    'Change %': [f"{pct:+.2f}%" for pct in percentage_changes]
-                                }
-                                summary_df = pd.DataFrame(summary_data)
-                                st.dataframe(summary_df, use_container_width=True)
-                                
-                                # Visualization
-                                st.write("**📈 Visual Comparison:**")
-                                
-                                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-                                
-                                # Bar chart comparing baseline vs modified
-                                x_pos = np.arange(len(output_cols))
-                                width = 0.35
-                                
-                                ax1.bar(x_pos - width/2, baseline_predictions, width, label='Baseline', alpha=0.8, color='skyblue')
-                                ax1.bar(x_pos + width/2, modified_predictions, width, label='Modified', alpha=0.8, color='lightcoral')
-                                
-                                ax1.set_xlabel('Output Variables')
-                                ax1.set_ylabel('Predicted Values')
-                                ax1.set_title('Baseline vs Modified Predictions')
-                                ax1.set_xticks(x_pos)
-                                ax1.set_xticklabels(output_cols, rotation=45)
-                                ax1.legend()
-                                ax1.grid(True, alpha=0.3)
-                                
-                                # Delta chart
-                                colors = ['green' if d >= 0 else 'red' for d in deltas]
-                                bars = ax2.bar(output_cols, deltas, color=colors, alpha=0.7)
-                                ax2.set_xlabel('Output Variables')
-                                ax2.set_ylabel('Delta (Modified - Baseline)')
-                                ax2.set_title(f'Impact of Changing {variable_to_change}')
-                                ax2.axhline(y=0, color='black', linestyle='-', alpha=0.3)
-                                ax2.grid(True, alpha=0.3)
-                                plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
-                                
-                                # Add value labels on bars
-                                for bar, delta, pct in zip(bars, deltas, percentage_changes):
-                                    height = bar.get_height()
-                                    ax2.text(bar.get_x() + bar.get_width()/2., height + (max(deltas) - min(deltas))*0.01,
-                                            f'{delta:+.2f}\n({pct:+.1f}%)', ha='center', va='bottom', fontsize=9)
-                                
-                                plt.tight_layout()
-                                st.pyplot(fig)
-                                
-                            else:
-                                st.error(f"Model {selected_model} not available. Please retrain the models.")
-                                
-                        except Exception as e:
-                            st.error(f"Error in variable impact test: {str(e)}")
-                            st.write("Please check your input values and model selection.")
-            
-            with calc_tab3:
-                st.write("Get predictions from all trained models at once:")
-                
-                with st.form("compare_models_form"):
-                    st.write("**Quick Input for Model Comparison:**")
-                    comparison_cols = st.columns(min(3, len(input_cols)))
-                    comparison_values = {}
-                    
-                    for i, col_name in enumerate(input_cols):
-                        col_idx = i % len(comparison_cols)
-                        with comparison_cols[col_idx]:
+                for row in input_rows:
+                    cols = st.columns(len(row))
+                    for i, col_name in enumerate(row):
+                        with cols[i]:
                             col_data = df_processed[col_name]
+                            min_val = float(col_data.min())
+                            max_val = float(col_data.max())
                             mean_val = float(col_data.mean())
+                            
                             display_name = str(col_name)
-                            comparison_values[col_name] = st.number_input(
+                            input_values[col_name] = st.number_input(
                                 f"{display_name}",
+                                min_value=min_val * 0.5,
+                                max_value=max_val * 1.5,
                                 value=mean_val,
-                                key=f"compare_{col_name}",
+                                step=(max_val - min_val) / 100,
                                 format="%.2f"
                             )
-                    
-                    compare_button = st.form_submit_button("🔍 Compare All Models", type="secondary")
-                    
-                    if compare_button:
-                        st.write("**Predictions from all models:**")
-                        
-                        comparison_input = np.array([[comparison_values[col] for col in input_cols]])
-                        comparison_results = {}
-                        
-                        for model_name in results.keys():
-                            try:
-                                if model_name in ml_models.models and ml_models.models[model_name] is not None:
-                                    model = ml_models.models[model_name]
-                                    
-                                    if model_name == "RNN" and model_name in ml_models.model_scalers:
-                                        rnn_scalers = ml_models.model_scalers[model_name]
-                                        input_scaled = rnn_scalers['X_scaler'].transform(comparison_input)
-                                        input_sequence = np.repeat(input_scaled, 10, axis=0).reshape(1, 10, -1)
-                                        pred_scaled = model.predict(input_sequence, verbose=0)
-                                        pred_log = rnn_scalers['y_scaler'].inverse_transform(pred_scaled)
-                                        preds = np.exp(pred_log)[0]
-                                    elif model_name == "ANN" and model_name in ml_models.model_scalers:
-                                        ann_scalers = ml_models.model_scalers[model_name]
-                                        input_scaled = ann_scalers['X_scaler'].transform(comparison_input)
-                                        pred_scaled = model.predict(input_scaled, verbose=0)
-                                        preds = ann_scalers['y_scaler'].inverse_transform(pred_scaled)[0]
-                                    elif model_name == "Linear Regression" or model_name == "Linear Regression (CV)":
-                                        models, scaler = model
-                                        comparison_scaled = scaler.transform(comparison_input)
-                                        preds = []
-                                        for lin_model in models:
-                                            pred = lin_model.predict(comparison_scaled)[0]
-                                            preds.append(pred)
-                                    elif model_name == "Polynomial Regression" or model_name == "Polynomial Regression (CV)":
-                                        preds = model.predict(comparison_input)[0]
-                                    elif model_name == "Exponential Regression" or model_name == "Exponential Regression (CV)":
-                                        models, scaler = model
-                                        comparison_scaled = scaler.transform(comparison_input)
-                                        preds = []
-                                        for exp_model in models:
-                                            if exp_model is None:
-                                                preds.append(0.0)
-                                            else:
-                                                try:
-                                                    log_pred = exp_model.predict(comparison_scaled)[0] 
-                                                    pred = np.exp(log_pred)
-                                                    preds.append(pred)
-                                                except:
-                                                    preds.append(0.0)
-                                    else:
-                                        preds = [0.0] * len(output_cols)
-                                    
-                                    comparison_results[model_name] = preds
-                                else:
-                                    comparison_results[model_name] = ["N/A"] * len(output_cols)
-                            except Exception as e:
-                                comparison_results[model_name] = ["Error"] * len(output_cols)
-                        
-                        comparison_df = pd.DataFrame(comparison_results, index=output_cols).T
-                        comparison_df = comparison_df.astype(str)
-                        
-                        for col in comparison_df.columns:
-                            try:
-                                comparison_df[col] = pd.to_numeric(comparison_df[col], errors='coerce')
-                                # Apply uniform 2 decimal rounding
-                                comparison_df[col] = comparison_df[col].round(2)
-                            except:
-                                pass
-                        
-                        st.dataframe(comparison_df)
-            
-            with calc_tab4:
-                self._sensitivity_analysis(results, input_cols, output_cols, df_processed, ml_models)
-        
-        with info_col:
-            info_tab1, info_tab2 = st.tabs(["📊 Model Comparison", "📐 Model Equations"])
-            
-            with info_tab1:
-                st.write("**Performance Comparison Table:**")
-                try:
-                    styled_df = results_df.style.highlight_max(subset=["R²"]).highlight_min(subset=["MAPE"])
-                    st.dataframe(styled_df)
-                except Exception as e:
-                    try:
-                        clean_results = results_df.copy().reset_index()
-                        for col in clean_results.columns:
-                            if clean_results[col].dtype == 'object':
-                                clean_results[col] = clean_results[col].astype(str)
-                            elif np.issubdtype(clean_results[col].dtype, np.number):
-                                clean_results[col] = clean_results[col].astype('float64')
-                        st.dataframe(clean_results)
-                    except Exception as e2:
-                        st.error(f"Could not display results table: {str(e2)}")
-                        st.write("Results:", results_df.to_dict())
                 
-                st.write("**Performance Charts:**")
+                st.write("**Model Selection:**")
+                model_options = list(results.keys())
+                default_model_idx = model_options.index(best_model)
+                
+                selected_model = st.selectbox(
+                    "Choose model for prediction:",
+                    options=model_options,
+                    index=default_model_idx,
+                    help=f"Best model ({best_model}) is selected by default"
+                )
+                model_info = {
+                    "Linear Regression": "Direct mathematical relationship",
+                    "Linear Regression (CV)": "Direct mathematical relationship with cross-validation",
+                    "Polynomial Regression": "Non-linear relationships with polynomial features",
+                    "Polynomial Regression (CV)": "Non-linear relationships with polynomial features and cross-validation",
+                    "Exponential Regression": "Log-linear transformation for exponential relationships",
+                    "Exponential Regression (CV)": "Log-linear transformation for exponential relationships with cross-validation",
+                    "ANN": "Deep learning with batch normalization (TF Nightly optimized)",
+                    "RNN": "Sequence-based predictions with bidirectional GRU (TF Nightly optimized)"
+                }
+                
+                if selected_model in model_info:
+                    st.info(f"**{selected_model}**: {model_info[selected_model]}")
+                
+                selected_r2 = results[selected_model]["R²"]
+                selected_mape = results[selected_model]["MAPE"]
+                st.write(f"**Selected Model Performance**: R² = {selected_r2:.2f}, MAPE = {selected_mape:.2f}")
+                
+                predict_button = st.form_submit_button("🚀 Predict", type="primary")
+                
+                if predict_button:
+                    try:
+                        input_array = np.array([[input_values[col] for col in input_cols]])
+                        if selected_model in ml_models.models and ml_models.models[selected_model] is not None:
+                            model = ml_models.models[selected_model]
+                            
+                            if selected_model == "RNN":
+                                if selected_model in ml_models.model_scalers:
+                                    rnn_scalers = ml_models.model_scalers[selected_model]
+                                    time_steps = 10
+                                    input_scaled = rnn_scalers['X_scaler'].transform(input_array)
+                                    
+                                    input_sequence = np.repeat(input_scaled, time_steps, axis=0).reshape(1, time_steps, -1)
+                                    
+                                    pred_scaled = model.predict(input_sequence, verbose=0)
+                                    pred_log = rnn_scalers['y_scaler'].inverse_transform(pred_scaled)
+                                    predictions = np.exp(pred_log)[0]
+                                else:
+                                    time_steps = 10
+                                    input_scaled = ml_models.X_scaler.transform(input_array)
+                                    input_sequence = np.repeat(input_scaled, time_steps, axis=0).reshape(1, time_steps, -1)
+                                    pred_scaled = model.predict(input_sequence, verbose=0)
+                                    pred_log = ml_models.y_scaler.inverse_transform(pred_scaled)
+                                    predictions = np.exp(pred_log)[0]
+                                
+                            elif selected_model == "ANN":
+                                if selected_model in ml_models.model_scalers:
+                                    ann_scalers = ml_models.model_scalers[selected_model]
+                                    input_scaled = ann_scalers['X_scaler'].transform(input_array)
+                                    pred_scaled = model.predict(input_scaled, verbose=0)
+                                    predictions = ann_scalers['y_scaler'].inverse_transform(pred_scaled)[0]
+                                else:
+                                    input_scaled = ml_models.X_scaler.transform(input_array)
+                                    pred_scaled = model.predict(input_scaled, verbose=0)
+                                    predictions = pred_scaled[0]
+                                
+                            elif selected_model == "Linear Regression" or selected_model == "Linear Regression (CV)":
+                                models, scaler = model
+                                input_scaled = scaler.transform(input_array)
+                                predictions = []
+                                for i, lin_model in enumerate(models):
+                                    pred = lin_model.predict(input_scaled)[0]
+                                    predictions.append(pred)
+                                
+                            elif selected_model == "Polynomial Regression" or selected_model == "Polynomial Regression (CV)":
+                                predictions = model.predict(input_array)[0]
+                                
+                            elif selected_model == "Exponential Regression" or selected_model == "Exponential Regression (CV)":
+                                models, scaler = model
+                                input_scaled = scaler.transform(input_array)
+                                predictions = []
+                                for i, exp_model in enumerate(models):
+                                    if exp_model is None:
+                                        predictions.append(0.0)
+                                    else:
+                                        try:
+                                            log_pred = exp_model.predict(input_scaled)[0]
+                                            pred = np.exp(log_pred)
+                                            predictions.append(pred)
+                                        except:
+                                            predictions.append(0.0)
+                                
+                            else: 
+                                predictions = [0.0] * len(output_cols)
+                                                 
+                                st.success(f"✅ Predictions using **{selected_model}**:")
+                            
+                            pred_cols = st.columns(len(output_cols))
+                            for i, (col_name, pred_value) in enumerate(zip(output_cols, predictions)):
+                                with pred_cols[i]:
+                                    format_str = self._get_format_for_column(col_name)
+                                    st.metric(
+                                        label=f"**{col_name}**",
+                                        value=f"{float(pred_value):{format_str}}",
+                                        help=f"Predicted value for {col_name}"
+                                    )
+                            
+                            with st.expander("📋 Input Summary"):
+                                input_df = pd.DataFrame([input_values])
+                                st.dataframe(input_df)
+                                
+                            model_r2 = results[selected_model]["R²"]
+                            model_mape = results[selected_model]["MAPE"]
+                            
+                            confidence_color = "green" if model_r2 > 0.9 else "orange" if model_r2 > 0.7 else "red"
+                            st.markdown(f"""
+                            **Model Performance:**
+                            - R² Score: ::{confidence_color}[{model_r2:.2f}]
+                            - MAPE: {model_mape:.2f} ({model_mape*100:.2f}%)
+                            """)
+                            
+                        else:
+                            st.error(f"Model {selected_model} not available for prediction. Please retrain the models.")
+                            
+                    except Exception as e:
+                        st.error(f"Error making prediction: {str(e)}")
+                        st.write("Please check your input values and try again.")
+                    
+            with st.expander("💡 Example Input Values"):
+                st.write("Here are some example values from your dataset:")
+                example_data = df_processed[input_cols].sample(n=min(5, len(df_processed)), random_state=42)
+                
+                display_example = example_data.copy()
+                for col in display_example.columns:
+                    display_example[col] = display_example[col].astype('float64')
+                display_example = display_example.reset_index(drop=True)
+                
+                st.dataframe(display_example.round(2))
+                st.write("💡 **Tip**: You can copy these values to test the prediction functionality.")
+                
+                if st.button("🔄 Load Random Example", help="Load a random example into the input fields above"):
+                    st.rerun()
+        
+        with calc_tab2:
+            st.write("Test how changing one variable affects your predictions:")
+            
+            with st.form("variable_impact_form"):
+                st.write("**🎯 Baseline Input Values:**")
+                
+                baseline_values = {}
+                cols_per_row = 3
+                input_rows = [input_cols[i:i + cols_per_row] for i in range(0, len(input_cols), cols_per_row)]
+                
+                for row in input_rows:
+                    cols = st.columns(len(row))
+                    for i, col_name in enumerate(row):
+                        with cols[i]:
+                            col_data = df_processed[col_name]
+                            min_val = float(col_data.min())
+                            max_val = float(col_data.max())
+                            mean_val = float(col_data.mean())
+                            
+                            display_name = str(col_name)
+                            baseline_values[col_name] = st.number_input(
+                                f"{display_name} (baseline)",
+                                min_value=min_val * 0.5,
+                                max_value=max_val * 1.5,
+                                value=mean_val,
+                                step=(max_val - min_val) / 100,
+                                format="%.2f",
+                                key=f"baseline_{col_name}"
+                            )
+                
+                st.divider()
+                st.write("**🔀 Variable to Change:**")
+                
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    models = list(results_df.index)
-                    r2_scores = results_df["R²"].values
-                    colors = ['gold' if model == best_model else 'skyblue' for model in models]
-                    bars = ax.bar(models, r2_scores, color=colors)
-                    ax.set_ylabel('R² Score')
-                    ax.set_title('Model Performance (R² Score)')
-                    ax.set_ylim(0, 1)
-                    plt.xticks(rotation=45)
-                    
-                    for bar, score in zip(bars, r2_scores):
-                        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
-                               f'{score:.2f}', ha='center', va='bottom')
-                    
-                    plt.tight_layout()
-                    st.pyplot(fig)
+                    variable_to_change = st.selectbox(
+                        "Choose variable to modify:",
+                        options=input_cols,
+                        key="variable_impact_variable",
+                        help="This variable will be tested with a different value"
+                    )
                 
                 with col2:
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    mape_scores = results_df["MAPE"].values
-                    colors = ['gold' if model == best_model else 'lightcoral' for model in models]
-                    bars = ax.bar(models, mape_scores, color=colors)
-                    ax.set_ylabel('MAPE Score')
-                    ax.set_title('Model Performance (MAPE Score - Lower is Better)')
-                    plt.xticks(rotation=45)
+                    # Show info about selected variable
+                    col_data = df_processed[variable_to_change]
+                    min_val = float(col_data.min())
+                    max_val = float(col_data.max())
+                    mean_val = float(col_data.mean())
+                    baseline_val = baseline_values[variable_to_change]
                     
-                    for bar, score in zip(bars, mape_scores):
-                        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(mape_scores)*0.01,
-                               f'{score:.2f}', ha='center', va='bottom')
-                    
-                    plt.tight_layout()
-                    st.pyplot(fig)
+                    st.info(f"""
+                    **{variable_to_change} Info:**
+                    - Dataset Mean: {mean_val:.2f}
+                    - Dataset Range: [{min_val:.2f}, {max_val:.2f}]
+                    - Current Baseline: {baseline_val:.2f}
+                    """)
+                
+                st.write(f"**🎛️ Alternative Value for {variable_to_change}:**")
+                
+                modified_value = st.number_input(
+                    f"New value for {variable_to_change}:",
+                    min_value=min_val * 0.5,
+                    max_value=max_val * 1.5,
+                    value=baseline_val * 1.1,  # Default to 10% increase
+                    step=(max_val - min_val) / 100,
+                    format="%.2f",
+                    key=f"modified_{variable_to_change}",
+                    help=f"This will replace the baseline value of {baseline_val:.2f}"
+                )
+                
+                # Show the comparison
+                st.write("**📊 Comparison Summary:**")
+                comparison_col1, comparison_col2, comparison_col3 = st.columns(3)
+                
+                with comparison_col1:
+                    st.metric("Variable", variable_to_change)
+                with comparison_col2:
+                    st.metric("Baseline Value", f"{baseline_val:.2f}")
+                with comparison_col3:
+                    st.metric("Modified Value", f"{modified_value:.2f}", 
+                             delta=f"{modified_value - baseline_val:+.2f}")
+                
+                st.write("**🤖 Model Selection:**")
+                model_options = list(results.keys())
+                results_df = pd.DataFrame({
+                    model: {"R²": float(results[model]["R²"]), "MAPE": float(results[model]["MAPE"])} 
+                    for model in results.keys()
+                }).T.sort_values("R²", ascending=False)
+                best_model = results_df.index[0]
+                default_model_idx = model_options.index(best_model)
+                
+                selected_model = st.selectbox(
+                    "Choose model for variable impact test:",
+                    options=model_options,
+                    index=default_model_idx,
+                    help=f"Best model ({best_model}) is selected by default",
+                    key="variable_impact_model"
+                )
+                
+                test_button = st.form_submit_button("🧪 Run Variable Impact Test", type="primary")
+                
+                if test_button:
+                    try:
+                        # Prepare baseline input array
+                        baseline_array = np.array([[baseline_values[col] for col in input_cols]])
+                        
+                        # Prepare modified input array
+                        modified_values = baseline_values.copy()
+                        modified_values[variable_to_change] = modified_value
+                        modified_array = np.array([[modified_values[col] for col in input_cols]])
+                        
+                        if selected_model in ml_models.models and ml_models.models[selected_model] is not None:
+                            # Get baseline predictions
+                            baseline_predictions = self._get_model_prediction(selected_model, baseline_array, ml_models)
+                            
+                            # Get modified predictions
+                            modified_predictions = self._get_model_prediction(selected_model, modified_array, ml_models)
+                            
+                            # Calculate deltas
+                            deltas = [mod - base for mod, base in zip(modified_predictions, baseline_predictions)]
+                            percentage_changes = []
+                            for i, (base, delta) in enumerate(zip(baseline_predictions, deltas)):
+                                if base != 0:
+                                    pct = (delta / base) * 100
+                                else:
+                                    pct = 0.0
+                                percentage_changes.append(pct)
+                            
+                            st.success(f"✅ Variable Impact Test Complete using **{selected_model}**")
+                            
+                            # Display baseline results
+                            st.write("**📊 Baseline Results:**")
+                            baseline_cols = st.columns(len(output_cols))
+                            for i, (col_name, pred_value) in enumerate(zip(output_cols, baseline_predictions)):
+                                with baseline_cols[i]:
+                                    format_str = self._get_format_for_column(col_name)
+                                    st.metric(
+                                        label=f"**{col_name}**",
+                                        value=f"{float(pred_value):{format_str}}",
+                                        help="Prediction with original values"
+                                    )
+                            
+                            # Display modified results
+                            st.write("**🔄 Modified Results:**")
+                            modified_cols = st.columns(len(output_cols))
+                            for i, (col_name, pred_value) in enumerate(zip(output_cols, modified_predictions)):
+                                with modified_cols[i]:
+                                    format_str = self._get_format_for_column(col_name)
+                                    st.metric(
+                                        label=f"**{col_name}**",
+                                        value=f"{float(pred_value):{format_str}}",
+                                        help=f"Prediction with {variable_to_change} = {modified_value:.2f}"
+                                    )
+                            
+                            # Display delta results
+                            st.write("**📈 Delta Results:**")
+                            delta_cols = st.columns(len(output_cols))
+                            for i, (col_name, delta_value) in enumerate(zip(output_cols, deltas)):
+                                with delta_cols[i]:
+                                    delta_color = "normal"
+                                    if abs(delta_value) > abs(baseline_predictions[i]) * 0.05:  # >5% change
+                                        delta_color = "inverse"
+                                    
+                                    format_str = self._get_format_for_column(col_name)
+                                    st.metric(
+                                        label=f"**{col_name}**",
+                                        value=f"{delta_value:+{format_str[1:]}}",
+                                        delta=f"{percentage_changes[i]:+.2f}%",
+                                        delta_color=delta_color,
+                                        help="Difference (Modified - Baseline)"
+                                    )
+                            
+                            # Summary table
+                            st.write("**📋 Summary Table:**")
+                            summary_data = {
+                                'Output': output_cols,
+                                'Baseline': [f"{pred:{self._get_format_for_column(col)}}" for pred, col in zip(baseline_predictions, output_cols)],
+                                'Modified': [f"{pred:{self._get_format_for_column(col)}}" for pred, col in zip(modified_predictions, output_cols)],
+                                'Delta': [f"{delta:+{self._get_format_for_column(col)[1:]}}" for delta, col in zip(deltas, output_cols)],
+                                'Change %': [f"{pct:+.2f}%" for pct in percentage_changes]
+                            }
+                            summary_df = pd.DataFrame(summary_data)
+                            st.dataframe(summary_df, use_container_width=True)
+                            
+                            # Visualization
+                            st.write("**📈 Visual Comparison:**")
+                            
+                            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+                            
+                            # Bar chart comparing baseline vs modified
+                            x_pos = np.arange(len(output_cols))
+                            width = 0.35
+                            
+                            ax1.bar(x_pos - width/2, baseline_predictions, width, label='Baseline', alpha=0.8, color='skyblue')
+                            ax1.bar(x_pos + width/2, modified_predictions, width, label='Modified', alpha=0.8, color='lightcoral')
+                            
+                            ax1.set_xlabel('Output Variables')
+                            ax1.set_ylabel('Predicted Values')
+                            ax1.set_title('Baseline vs Modified Predictions')
+                            ax1.set_xticks(x_pos)
+                            ax1.set_xticklabels(output_cols, rotation=45)
+                            ax1.legend()
+                            ax1.grid(True, alpha=0.3)
+                            
+                            # Delta chart
+                            colors = ['green' if d >= 0 else 'red' for d in deltas]
+                            bars = ax2.bar(output_cols, deltas, color=colors, alpha=0.7)
+                            ax2.set_xlabel('Output Variables')
+                            ax2.set_ylabel('Delta (Modified - Baseline)')
+                            ax2.set_title(f'Impact of Changing {variable_to_change}')
+                            ax2.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+                            ax2.grid(True, alpha=0.3)
+                            plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
+                            
+                            # Add value labels on bars
+                            for bar, delta, pct in zip(bars, deltas, percentage_changes):
+                                height = bar.get_height()
+                                ax2.text(bar.get_x() + bar.get_width()/2., height + (max(deltas) - min(deltas))*0.01,
+                                        f'{delta:+.2f}\n({pct:+.1f}%)', ha='center', va='bottom', fontsize=9)
+                            
+                            plt.tight_layout()
+                            st.pyplot(fig)
+                            
+                        else:
+                            st.error(f"Model {selected_model} not available. Please retrain the models.")
+                            
+                    except Exception as e:
+                        st.error(f"Error in variable impact test: {str(e)}")
+                        st.write("Please check your input values and model selection.")
+        
+        with calc_tab3:
+            st.write("Get predictions from all trained models at once:")
             
-            with info_tab2:
-                # Display learned formulas
-                self._display_learned_formulas(input_cols, output_cols, ml_models)
+            with st.form("compare_models_form"):
+                st.write("**Quick Input for Model Comparison:**")
+                comparison_cols = st.columns(min(3, len(input_cols)))
+                comparison_values = {}
+                
+                for i, col_name in enumerate(input_cols):
+                    col_idx = i % len(comparison_cols)
+                    with comparison_cols[col_idx]:
+                        col_data = df_processed[col_name]
+                        mean_val = float(col_data.mean())
+                        display_name = str(col_name)
+                        comparison_values[col_name] = st.number_input(
+                            f"{display_name}",
+                            value=mean_val,
+                            key=f"compare_{col_name}",
+                            format="%.2f"
+                        )
+                
+                compare_button = st.form_submit_button("🔍 Compare All Models", type="secondary")
+                
+                if compare_button:
+                    st.write("**Predictions from all models:**")
+                    
+                    comparison_input = np.array([[comparison_values[col] for col in input_cols]])
+                    comparison_results = {}
+                    
+                    for model_name in results.keys():
+                        try:
+                            if model_name in ml_models.models and ml_models.models[model_name] is not None:
+                                model = ml_models.models[model_name]
+                                
+                                if model_name == "RNN" and model_name in ml_models.model_scalers:
+                                    rnn_scalers = ml_models.model_scalers[model_name]
+                                    input_scaled = rnn_scalers['X_scaler'].transform(comparison_input)
+                                    input_sequence = np.repeat(input_scaled, 10, axis=0).reshape(1, 10, -1)
+                                    pred_scaled = model.predict(input_sequence, verbose=0)
+                                    pred_log = rnn_scalers['y_scaler'].inverse_transform(pred_scaled)
+                                    preds = np.exp(pred_log)[0]
+                                elif model_name == "ANN" and model_name in ml_models.model_scalers:
+                                    ann_scalers = ml_models.model_scalers[model_name]
+                                    input_scaled = ann_scalers['X_scaler'].transform(comparison_input)
+                                    pred_scaled = model.predict(input_scaled, verbose=0)
+                                    preds = ann_scalers['y_scaler'].inverse_transform(pred_scaled)[0]
+                                elif model_name == "Linear Regression" or model_name == "Linear Regression (CV)":
+                                    models, scaler = model
+                                    comparison_scaled = scaler.transform(comparison_input)
+                                    preds = []
+                                    for lin_model in models:
+                                        pred = lin_model.predict(comparison_scaled)[0]
+                                        preds.append(pred)
+                                elif model_name == "Polynomial Regression" or model_name == "Polynomial Regression (CV)":
+                                    preds = model.predict(comparison_input)[0]
+                                elif model_name == "Exponential Regression" or model_name == "Exponential Regression (CV)":
+                                    models, scaler = model
+                                    comparison_scaled = scaler.transform(comparison_input)
+                                    preds = []
+                                    for exp_model in models:
+                                        if exp_model is None:
+                                            preds.append(0.0)
+                                        else:
+                                            try:
+                                                log_pred = exp_model.predict(comparison_scaled)[0] 
+                                                pred = np.exp(log_pred)
+                                                preds.append(pred)
+                                            except:
+                                                preds.append(0.0)
+                                else:
+                                    preds = [0.0] * len(output_cols)
+                                
+                                comparison_results[model_name] = preds
+                            else:
+                                comparison_results[model_name] = ["N/A"] * len(output_cols)
+                        except Exception as e:
+                            comparison_results[model_name] = ["Error"] * len(output_cols)
+                    
+                    comparison_df = pd.DataFrame(comparison_results, index=output_cols).T
+                    comparison_df = comparison_df.astype(str)
+                    
+                    for col in comparison_df.columns:
+                        try:
+                            comparison_df[col] = pd.to_numeric(comparison_df[col], errors='coerce')
+                            # Apply uniform 2 decimal rounding
+                            comparison_df[col] = comparison_df[col].round(2)
+                        except:
+                            pass
+                        
+                    st.dataframe(comparison_df)
+        
+        with calc_tab4:
+            st.write("**Performance Comparison Table:**")
+            try:
+                styled_df = results_df.style.highlight_max(subset=["R²"]).highlight_min(subset=["MAPE"])
+                st.dataframe(styled_df)
+            except Exception as e:
+                try:
+                    clean_results = results_df.copy().reset_index()
+                    for col in clean_results.columns:
+                        if clean_results[col].dtype == 'object':
+                            clean_results[col] = clean_results[col].astype(str)
+                        elif np.issubdtype(clean_results[col].dtype, np.number):
+                            clean_results[col] = clean_results[col].astype('float64')
+                    st.dataframe(clean_results)
+                except Exception as e2:
+                    st.error(f"Could not display results table: {str(e2)}")
+                    st.write("Results:", results_df.to_dict())
+            
+            st.write("**Performance Charts:**")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                fig, ax = plt.subplots(figsize=(10, 6))
+                models = list(results_df.index)
+                r2_scores = results_df["R²"].values
+                colors = ['gold' if model == best_model else 'skyblue' for model in models]
+                bars = ax.bar(models, r2_scores, color=colors)
+                ax.set_ylabel('R² Score')
+                ax.set_title('Model Performance (R² Score)')
+                ax.set_ylim(0, 1)
+                plt.xticks(rotation=45)
+                
+                for bar, score in zip(bars, r2_scores):
+                    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
+                           f'{score:.2f}', ha='center', va='bottom')
+                
+                plt.tight_layout()
+                st.pyplot(fig)
+            
+            with col2:
+                fig, ax = plt.subplots(figsize=(10, 6))
+                mape_scores = results_df["MAPE"].values
+                colors = ['gold' if model == best_model else 'lightcoral' for model in models]
+                bars = ax.bar(models, mape_scores, color=colors)
+                ax.set_ylabel('MAPE Score')
+                ax.set_title('Model Performance (MAPE Score - Lower is Better)')
+                plt.xticks(rotation=45)
+                
+                for bar, score in zip(bars, mape_scores):
+                    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(mape_scores)*0.01,
+                           f'{score:.2f}', ha='center', va='bottom')
+                
+                plt.tight_layout()
+                st.pyplot(fig)
+        
+        with calc_tab5:
+            # Display learned formulas
+            self._display_learned_formulas(input_cols, output_cols, ml_models)
 
 st.title("🤖 ML Regression Dashboard - TF Nightly Edition")
 st.write("Upload an Excel file to run regression models (Linear, Polynomial, Exponential + CV versions, ANN, RNN) and view results.")
@@ -1819,177 +1810,39 @@ if uploaded_file is not None:
             st.warning("⚠️ Please select both input and output columns before training models")
         
         # Column Selection (Minimizable) - 1/2 width
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            with st.expander("🎯 Column Selection", expanded=False):
-                st.write("**Input Columns:**")
-                if input_cols:
-                    st.success(f"✅ {len(input_cols)} input columns")
-                else:
-                    st.warning("⚠️ No input columns")
-                
-                available_cols = df_processed.select_dtypes(include=[np.number]).columns.tolist()
-                selected_inputs = st.multiselect("Select Input Columns", available_cols, default=input_cols)
-                
-                st.write("")  # Spacing
-                
-                st.write("**Output Columns:**")  
-                if output_cols:
-                    st.success(f"✅ {len(output_cols)} output columns")
-                else:
-                    st.warning("⚠️ No output columns")
-                
-                selected_outputs = st.multiselect("Select Output Columns", available_cols, default=output_cols)
+        
+        with st.expander("🎯 Column Selection", expanded=False):
+            st.write("**Input Columns:**")
+            if input_cols:
+                st.success(f"✅ {len(input_cols)} input columns")
+            else:
+                st.warning("⚠️ No input columns")
+            
+            available_cols = df_processed.select_dtypes(include=[np.number]).columns.tolist()
+            selected_inputs = st.multiselect("Select Input Columns", available_cols, default=input_cols)
+            
+            st.write("")  # Spacing
+            
+            st.write("**Output Columns:**")  
+            if output_cols:
+                st.success(f"✅ {len(output_cols)} output columns")
+            else:
+                st.warning("⚠️ No output columns")
+           
+            selected_outputs = st.multiselect("Select Output Columns", available_cols, default=output_cols)
 
-                if selected_inputs:
-                    input_cols = selected_inputs
-                if selected_outputs:
-                    output_cols = selected_outputs
+            if selected_inputs:
+                input_cols = selected_inputs
+            if selected_outputs:
+                output_cols = selected_outputs
         
         # Model Management Section (next to column selection)
-        with col2:
-            with st.expander("🔧 Model Management", expanded=False):
-                # Create tabs for different model operations
-                tab1, tab2, tab3 = st.tabs(["🚀 Train New Models", "💾 Save/Load Models", "📁 Manage Saved Models"])
-                
-                with tab1:
-                    # Auto-save option
-                    auto_save = st.checkbox("💾 Auto-save models after training", value=True, help="Automatically save models for future use")
-                    
-                    if st.button("🚀 Run All Models", type="primary"):
-                        if len(input_cols) > 0 and len(output_cols) > 0:
-                            try:
-                                X = df_processed[input_cols].values
-                                y = df_processed[output_cols].values
-                                mask = ~(np.isnan(X).any(axis=1) | np.isnan(y).any(axis=1))
-                                X = X[mask]
-                                y = y[mask]
-                                if X.shape[0] < 10:
-                                    st.error("Not enough data points after cleaning. Need at least 10 rows.")
-                                else:
-                                    st.write("🔄 Running all models... It might take a while!")
-                                    results = ml_models.run_all_models(X, y, input_cols, output_cols)
-                                    st.session_state.model_results = results
-                                    st.session_state.trained_models = ml_models
-                                    st.session_state.model_input_cols = input_cols
-                                    st.session_state.model_output_cols = output_cols
-                                    st.session_state.processed_data = df_processed
-                                    
-                                    # Auto-save if enabled
-                                    if auto_save:
-                                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                        auto_save_name = f"auto_save_{timestamp}"
-                                        saved_name = ml_models.save_models(auto_save_name)
-                                        if saved_name:
-                                            st.info(f"🔄 Models auto-saved as: {saved_name}")
-                                    
-                                    st.success("✅ Models trained successfully! Results are now persistent across page interactions.")
-                                    st.balloons()
-                                    st.success("🎉 Tamamdır eline sağlık! Modeller başarıyla eğitildi ve özel hassasiyet ayarları uygulandı.")
-                            except Exception as e:
-                                st.error(f"Error running models: {str(e)}")
-                                st.write("Please check your data format and try again.")
-                        else:
-                            st.warning("Please select at least one input and one output column.")
-                
-                with tab2:
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.write("**💾 Save Current Models**")
-                        if st.session_state.get('trained_models') is not None:
-                            custom_name = st.text_input("Model Name (optional)", help="Leave empty for auto-generated timestamp name")
-                            if st.button("💾 Save Models", type="secondary"):
-                                saved_name = st.session_state.trained_models.save_models(custom_name if custom_name else None)
-                                if saved_name:
-                                    st.success(f"✅ Models saved as: {saved_name}")
-                                else:
-                                    st.error("❌ Failed to save models")
-                        else:
-                            st.info("ℹ️ Train models first before saving")
-                    
-                    with col2:
-                        st.write("**📂 Load Saved Models**")
-                        saved_models = ml_models.get_saved_models_list()
-                        if saved_models:
-                            selected_model = st.selectbox("Choose saved model:", saved_models)
-                            if st.button("📂 Load Models", type="secondary"):
-                                temp_ml_models = MLModels()
-                                if temp_ml_models.load_models(selected_model):
-                                    st.session_state.model_results = temp_ml_models.results
-                                    st.session_state.trained_models = temp_ml_models
-                                    st.session_state.model_input_cols = temp_ml_models.input_cols
-                                    st.session_state.model_output_cols = temp_ml_models.output_cols
-                                    st.session_state.processed_data = df_processed  # Keep current data
-                                    st.success(f"✅ Models loaded from: {selected_model}")
-                                    st.rerun()
-                                else:
-                                    st.error("❌ Failed to load models")
-                        else:
-                            st.info("ℹ️ No saved models found")
-                    
-                    with tab3:
-                        st.write("**🗂️ Saved Models**")
-                        saved_models = ml_models.get_saved_models_list()
-                        if saved_models:
-                            for model_name in saved_models:
-                                with st.expander(f"📁 {model_name}", expanded=False):
-                                    # Buttons at the top in equal columns
-                                    col1, col2 = st.columns([1, 1])
-                                    with col1:
-                                        if st.button("📂 Load", key=f"load_{model_name}", help=f"Load {model_name}"):
-                                            temp_ml_models = MLModels()
-                                            if temp_ml_models.load_models(model_name):
-                                                st.session_state.model_results = temp_ml_models.results
-                                                st.session_state.trained_models = temp_ml_models
-                                                st.session_state.model_input_cols = temp_ml_models.input_cols
-                                                st.session_state.model_output_cols = temp_ml_models.output_cols
-                                                st.session_state.processed_data = df_processed
-                                                st.success(f"✅ Loaded: {model_name}")
-                                                st.rerun()
-                                    with col2:
-                                        if st.button("🗑️ Delete", key=f"delete_{model_name}", help=f"Delete {model_name}"):
-                                            if ml_models.delete_saved_model(model_name):
-                                                st.success(f"✅ Deleted: {model_name}")
-                                                st.rerun()
-                                            else:
-                                                st.error(f"❌ Failed to delete: {model_name}")
-                                    
-                                    # Model metadata info below
-                                    try:
-                                        temp_ml = MLModels()
-                                        save_data = joblib.load(f'saved_models/{model_name}.pkl')
-                                        metadata = save_data.get('model_metadata', {})
-                                        
-                                        if metadata:
-                                            st.write(f"**Training Date:** {metadata.get('training_timestamp', 'Unknown')[:19]}")
-                                            st.write(f"**Input Features:** {metadata.get('n_input_features', 'Unknown')}")
-                                            st.write(f"**Output Features:** {metadata.get('n_output_features', 'Unknown')}")
-                                            st.write(f"**Data Shape:** {metadata.get('data_shape', 'Unknown')}")
-                                            
-                                            if 'input_cols' in save_data and save_data['input_cols']:
-                                                st.write(f"**Input Columns:** {', '.join(save_data['input_cols'])}")
-                                            if 'output_cols' in save_data and save_data['output_cols']:
-                                                st.write(f"**Output Columns:** {', '.join(save_data['output_cols'])}")
-                                        
-                                        # Show model results if available
-                                        if 'results' in save_data and save_data['results']:
-                                            st.write("**Model Performance:**")
-                                            results_df = pd.DataFrame({
-                                                model: {"R²": float(save_data['results'][model]["R²"]), "MAPE": float(save_data['results'][model]["MAPE"])} 
-                                                for model in save_data['results'].keys()
-                                            }).T.sort_values("R²", ascending=False)
-                                            st.dataframe(results_df.head(3))  # Show top 3 models
-                                    except:
-                                        st.write("*Model info unavailable*")
-                        else:
-                            st.info("ℹ️ No saved models found")
         
         # Data Analysis in Tabs (Secondary Information)
         st.divider()
         st.subheader("📊 Data Analysis & Information")
         
-        data_tab1, data_tab2, data_tab3 = st.tabs(["📈 Statistics & Correlation", "📋 Raw Data", "🔍 Column Details"])
+        data_tab1, data_tab2, data_tab3, data_tab4 = st.tabs(["📈 Data Relationships", "📊 Data Statistics" , "📋 Raw Data", "🔍 Column Details"])
         
         with data_tab1:
             if input_cols and output_cols:
@@ -1997,7 +1850,7 @@ if uploaded_file is not None:
                     analysis_cols = input_cols + output_cols
                     if analysis_cols:
                         # Side by side layout
-                        col1, col2 = st.columns([1, 1])
+                        col1, col2 = st.columns([1, 2])
                         
                         with col1:
                             if len(input_cols) > 0 and len(output_cols) > 0:
@@ -2071,17 +1924,155 @@ if uploaded_file is not None:
                             st.pyplot(fig)
                             plt.close(fig)
                             
-                            # Data Statistics below relationships
-                            st.write("**Data Statistics:**")
-                            st.dataframe(df_processed[analysis_cols].describe().round(2))
                     else:
                         st.warning("No columns available for analysis.")
                 except Exception as e:
                     st.error(f"Error in data analysis: {str(e)}")
             else:
                 st.info("Select input and output columns to see statistics and correlation.")
+
+        with st.expander("🔧 Model Management", expanded=False):
+            # Create tabs for different model operations
+            tab1, tab2, tab3 = st.tabs(["🚀 Train New Models", "💾 Save/Load Models", "📁 Manage Saved Models"])
+            
+            with tab1:
+                # Auto-save option
+                auto_save = st.checkbox("💾 Auto-save models after training", value=True, help="Automatically save models for future use")
+                
+                if st.button("🚀 Run All Models", type="primary"):
+                    if len(input_cols) > 0 and len(output_cols) > 0:
+                        try:
+                            X = df_processed[input_cols].values
+                            y = df_processed[output_cols].values
+                            mask = ~(np.isnan(X).any(axis=1) | np.isnan(y).any(axis=1))
+                            X = X[mask]
+                            y = y[mask]
+                            if X.shape[0] < 10:
+                                st.error("Not enough data points after cleaning. Need at least 10 rows.")
+                            else:
+                                st.write("🔄 Running all models... It might take a while!")
+                                results = ml_models.run_all_models(X, y, input_cols, output_cols)
+                                st.session_state.model_results = results
+                                st.session_state.trained_models = ml_models
+                                st.session_state.model_input_cols = input_cols
+                                st.session_state.model_output_cols = output_cols
+                                st.session_state.processed_data = df_processed
+                                
+                                # Auto-save if enabled
+                                if auto_save:
+                                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                    auto_save_name = f"auto_save_{timestamp}"
+                                    saved_name = ml_models.save_models(auto_save_name)
+                                    if saved_name:
+                                        st.info(f"🔄 Models auto-saved as: {saved_name}")
+                                
+                                st.success("✅ Models trained successfully! Results are now persistent across page interactions.")
+                                st.balloons()
+                                st.success("🎉 Tamamdır eline sağlık! Modeller başarıyla eğitildi ve özel hassasiyet ayarları uygulandı.")
+                        except Exception as e:
+                            st.error(f"Error running models: {str(e)}")
+                            st.write("Please check your data format and try again.")
+                    else:
+                        st.warning("Please select at least one input and one output column.")
+            
+            with tab2:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**💾 Save Current Models**")
+                    if st.session_state.get('trained_models') is not None:
+                        custom_name = st.text_input("Model Name (optional)", help="Leave empty for auto-generated timestamp name")
+                        if st.button("💾 Save Models", type="secondary"):
+                            saved_name = st.session_state.trained_models.save_models(custom_name if custom_name else None)
+                            if saved_name:
+                                st.success(f"✅ Models saved as: {saved_name}")
+                            else:
+                                st.error("❌ Failed to save models")
+                    else:
+                        st.info("ℹ️ Train models first before saving")
+                
+                with col2:
+                    st.write("**📂 Load Saved Models**")
+                    saved_models = ml_models.get_saved_models_list()
+                    if saved_models:
+                        selected_model = st.selectbox("Choose saved model:", saved_models)
+                        if st.button("📂 Load Models", type="secondary"):
+                            temp_ml_models = MLModels()
+                            if temp_ml_models.load_models(selected_model):
+                                st.session_state.model_results = temp_ml_models.results
+                                st.session_state.trained_models = temp_ml_models
+                                st.session_state.model_input_cols = temp_ml_models.input_cols
+                                st.session_state.model_output_cols = temp_ml_models.output_cols
+                                st.session_state.processed_data = df_processed  # Keep current data
+                                st.success(f"✅ Models loaded from: {selected_model}")
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to load models")
+                    else:
+                        st.info("ℹ️ No saved models found")
+                
+                with tab3:
+                    st.write("**🗂️ Saved Models**")
+                    saved_models = ml_models.get_saved_models_list()
+                    if saved_models:
+                        for model_name in saved_models:
+                            with st.expander(f"📁 {model_name}", expanded=False):
+                                # Buttons at the top in equal columns
+                                col1, col2 = st.columns([1, 1])
+                                with col1:
+                                    if st.button("📂 Load", key=f"load_{model_name}", help=f"Load {model_name}"):
+                                        temp_ml_models = MLModels()
+                                        if temp_ml_models.load_models(model_name):
+                                            st.session_state.model_results = temp_ml_models.results
+                                            st.session_state.trained_models = temp_ml_models
+                                            st.session_state.model_input_cols = temp_ml_models.input_cols
+                                            st.session_state.model_output_cols = temp_ml_models.output_cols
+                                            st.session_state.processed_data = df_processed
+                                            st.success(f"✅ Loaded: {model_name}")
+                                            st.rerun()
+                                with col2:
+                                    if st.button("🗑️ Delete", key=f"delete_{model_name}", help=f"Delete {model_name}"):
+                                        if ml_models.delete_saved_model(model_name):
+                                            st.success(f"✅ Deleted: {model_name}")
+                                            st.rerun()
+                                        else:
+                                            st.error(f"❌ Failed to delete: {model_name}")
+                                
+                                # Model metadata info below
+                                try:
+                                    temp_ml = MLModels()
+                                    save_data = joblib.load(f'saved_models/{model_name}.pkl')
+                                    metadata = save_data.get('model_metadata', {})
+                                    
+                                    if metadata:
+                                        st.write(f"**Training Date:** {metadata.get('training_timestamp', 'Unknown')[:19]}")
+                                        st.write(f"**Input Features:** {metadata.get('n_input_features', 'Unknown')}")
+                                        st.write(f"**Output Features:** {metadata.get('n_output_features', 'Unknown')}")
+                                        st.write(f"**Data Shape:** {metadata.get('data_shape', 'Unknown')}")
+                                        
+                                        if 'input_cols' in save_data and save_data['input_cols']:
+                                            st.write(f"**Input Columns:** {', '.join(save_data['input_cols'])}")
+                                        if 'output_cols' in save_data and save_data['output_cols']:
+                                            st.write(f"**Output Columns:** {', '.join(save_data['output_cols'])}")
+                                    
+                                    # Show model results if available
+                                    if 'results' in save_data and save_data['results']:
+                                        st.write("**Model Performance:**")
+                                        results_df = pd.DataFrame({
+                                            model: {"R²": float(save_data['results'][model]["R²"]), "MAPE": float(save_data['results'][model]["MAPE"])} 
+                                            for model in save_data['results'].keys()
+                                        }).T.sort_values("R²", ascending=False)
+                                        st.dataframe(results_df.head(3))  # Show top 3 models
+                                except:
+                                    st.write("*Model info unavailable*")
+                    else:
+                        st.info("ℹ️ No saved models found")
         
         with data_tab2:
+            st.write("**Data Statistics:**")
+            st.dataframe(df_processed[analysis_cols].describe().round(2))
+
+        with data_tab3:
             st.write("**Original data preview:**")
             st.dataframe(df.head())
             st.write("**After preprocessing:**")
@@ -2095,7 +2086,7 @@ if uploaded_file is not None:
             with col3:
                 st.metric("Missing Values", df_processed.isnull().sum().sum())
         
-        with data_tab3:
+        with data_tab4:
             col1, col2 = st.columns(2)
             with col1:
                 st.write("**Input Columns:**")
@@ -2125,11 +2116,14 @@ if uploaded_file is not None:
             
             df_clean = df_clean.dropna()
             df_clean = df_clean.reset_index(drop=True)
+            
             for col in df_clean.columns:
                 if df_clean[col].dtype not in ['float64', 'int64', 'float32', 'int32']:
                     df_clean[col] = df_clean[col].astype('float64')
             
             return df_clean
+        
+
         
         df_processed = make_arrow_compatible(df_processed)
         
